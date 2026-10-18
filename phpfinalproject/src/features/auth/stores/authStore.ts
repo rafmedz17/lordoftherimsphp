@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import { api } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   name: string;
@@ -10,25 +12,49 @@ interface User {
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role?: 'customer' | 'admin') => Promise<void>;
-  logout: () => void;
+  /** False until the initial session check with the server has finished. */
+  isReady: boolean;
+  checkSession: () => Promise<void>;
+  login: (email: string, password: string, options?: { admin?: boolean }) => Promise<User>;
+  register: (name: string, email: string, password: string) => Promise<User>;
+  logout: () => Promise<void>;
 }
+
+type UserResponse = { user: User | null };
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
-  login: async (email: string, password: string, role: 'customer' | 'admin' = 'customer') => {
-    // TODO: Replace with actual API call when Lovable Cloud is connected
-    // For now, using mock authentication
-    const mockUser: User = {
-      id: '1',
-      email,
-      name: email.split('@')[0],
-      role,
-    };
-    set({ user: mockUser, isAuthenticated: true });
+  isReady: false,
+
+  checkSession: async () => {
+    try {
+      const { user } = await api.get<UserResponse>('/auth/me');
+      set({ user, isAuthenticated: user !== null, isReady: true });
+    } catch {
+      set({ user: null, isAuthenticated: false, isReady: true });
+    }
   },
-  logout: () => {
-    set({ user: null, isAuthenticated: false });
+
+  login: async (email, password, options) => {
+    const { user } = await api.post<UserResponse>('/auth/login', { email, password, admin: options?.admin ?? false });
+    set({ user, isAuthenticated: true });
+    return user!;
+  },
+
+  register: async (name, email, password) => {
+    const { user } = await api.post<UserResponse>('/auth/register', { name, email, password });
+    set({ user, isAuthenticated: true });
+    return user!;
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      set({ user: null, isAuthenticated: false });
+      // Drop cached bookings and admin data that belonged to this session.
+      queryClient.clear();
+    }
   },
 }));

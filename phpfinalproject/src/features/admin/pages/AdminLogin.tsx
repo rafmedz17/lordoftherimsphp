@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,39 +7,41 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/features/auth/stores/authStore';
+import { errorMessage } from '@/lib/api';
 import { toast } from 'sonner';
-import { Shield, Loader2, Car} from 'lucide-react';
+import { Shield, Loader2 } from 'lucide-react';
 
 const adminLoginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  password: z.string().min(1, { message: 'Enter your password' }),
 });
 
 type AdminLoginFormData = z.infer<typeof adminLoginSchema>;
 
 export function AdminLogin() {
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
+  const { user, login } = useAuthStore();
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<AdminLoginFormData>({
     resolver: zodResolver(adminLoginSchema),
   });
 
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
   const onSubmit = async (data: AdminLoginFormData) => {
-    setIsLoading(true);
     try {
-      await login(data.email, data.password, 'admin');
+      // The server rejects non-admin accounts when `admin` is set.
+      await login(data.email, data.password, { admin: true });
       toast.success('Admin login successful');
       navigate('/admin/dashboard');
     } catch (error) {
-      toast.error('Failed to login. Please check your credentials.');
-    } finally {
-      setIsLoading(false);
+      toast.error(errorMessage(error));
     }
   };
 
@@ -65,6 +66,7 @@ export function AdminLogin() {
               <Input
                 id="admin-email"
                 type="email"
+                autoComplete="email"
                 placeholder="admin@lordoftherims.com"
                 className="bg-secondary border-border text-foreground"
                 {...register('email')}
@@ -78,6 +80,7 @@ export function AdminLogin() {
               <Input
                 id="admin-password"
                 type="password"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 className="bg-secondary border-border text-foreground"
                 {...register('password')}
@@ -89,9 +92,9 @@ export function AdminLogin() {
             <Button
               type="submit"
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-gold"
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Authenticating...

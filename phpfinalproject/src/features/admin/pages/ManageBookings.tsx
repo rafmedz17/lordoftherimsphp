@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -8,17 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAuthStore } from '@/features/auth/stores/authStore';
-import { useBookingStore } from '@/features/admin/stores/bookingStore';
 import { AdminSidebar } from '@/features/admin/components/AdminSidebar';
-import { Booking } from '@/features/admin/types/booking';
-import { Search, X, Eye, RefreshCw, XCircle } from 'lucide-react';
+import { useAllBookings, useCancelBooking, useUpdateBookingStatus } from '@/features/bookings/api';
+import { Booking } from '@/features/bookings/types/booking';
+import { getStatusColor } from '@/features/bookings/utils';
+import { errorMessage } from '@/lib/api';
+import { formatPeso } from '@/lib/format';
+import { Search, X, RefreshCw, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function ManageBookings() {
-  const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
-  const { bookings, updateBookingStatus, cancelBooking } = useBookingStore();
+  const { data: bookings = [], isLoading, isError, refetch } = useAllBookings();
+  const updateBookingStatus = useUpdateBookingStatus();
+  const cancelBooking = useCancelBooking();
 
   // Modal states
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -29,13 +30,6 @@ export function ManageBookings() {
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  // Check authentication
-  useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'admin') {
-      navigate('/adminlogin');
-    }
-  }, [isAuthenticated, user, navigate]);
 
   // Filter bookings
   const filteredBookings = useMemo(() => {
@@ -60,11 +54,14 @@ export function ManageBookings() {
   };
 
   // Save new status
-  const handleStatusUpdate = () => {
-    if (selectedBooking) {
-      updateBookingStatus(selectedBooking.id, newStatus);
+  const handleStatusUpdate = async () => {
+    if (!selectedBooking) return;
+    try {
+      await updateBookingStatus.mutateAsync({ id: selectedBooking.id, status: newStatus });
       toast.success(`Booking ${selectedBooking.bookingNumber} status updated to ${newStatus}`);
       setIsStatusModalOpen(false);
+    } catch (error) {
+      toast.error(errorMessage(error));
     }
   };
 
@@ -75,29 +72,15 @@ export function ManageBookings() {
   };
 
   // Confirm cancel
-  const handleCancelConfirm = () => {
-    if (selectedBooking) {
-      cancelBooking(selectedBooking.id);
+  const handleCancelConfirm = async () => {
+    if (!selectedBooking) return;
+    try {
+      await cancelBooking.mutateAsync(selectedBooking.id);
       toast.success(`Booking ${selectedBooking.bookingNumber} has been cancelled`);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
       setIsCancelModalOpen(false);
-    }
-  };
-
-  // Get status badge color
-  const getStatusColor = (status: Booking['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-500';
-      case 'confirmed':
-        return 'bg-blue-500';
-      case 'active':
-        return 'bg-green-500';
-      case 'completed':
-        return 'bg-gray-500';
-      case 'cancelled':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-500';
     }
   };
 
@@ -202,7 +185,7 @@ export function ManageBookings() {
                         <div className="text-xs text-muted-foreground">({booking.totalDays} days)</div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold text-primary">₱{booking.totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold text-primary">{formatPeso(booking.totalAmount)}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(booking.status)}>
                         {booking.status}
@@ -234,10 +217,27 @@ export function ManageBookings() {
               </TableBody>
             </Table>
 
-            {filteredBookings.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No bookings found. Try adjusting your search or filters.</p>
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : isError ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">Could not load bookings.</p>
+                <Button variant="outline" onClick={() => refetch()}>
+                  Try Again
+                </Button>
+              </div>
+            ) : (
+              filteredBookings.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    {bookings.length === 0
+                      ? 'No bookings yet.'
+                      : 'No bookings found. Try adjusting your search or filters.'}
+                  </p>
+                </div>
+              )
             )}
           </div>
         </main>
@@ -275,7 +275,8 @@ export function ManageBookings() {
             <Button variant="outline" onClick={() => setIsStatusModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleStatusUpdate} className="bg-primary">
+            <Button onClick={handleStatusUpdate} className="bg-primary" disabled={updateBookingStatus.isPending}>
+              {updateBookingStatus.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update Status
             </Button>
           </DialogFooter>

@@ -1,0 +1,4 @@
+# Send every request under /api to index.php, including paths that match real
+# files, so lib/, handlers/ and config.php can never be requested directly.
+RewriteEngine On
+RewriteRule ^ index.php [END,QSA]

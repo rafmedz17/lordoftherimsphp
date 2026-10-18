@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -9,17 +8,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAuthStore } from '@/features/auth/stores/authStore';
-import { useVehicleStore } from '@/features/admin/stores/vehicleStore';
 import { AdminSidebar } from '@/features/admin/components/AdminSidebar';
-import { Car } from '@/features/cars/types/car';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { uploadCarImage, useCars, useDeleteCar, useSaveCar } from '@/features/cars/api';
+import { Car, CarInput } from '@/features/cars/types/car';
+import { ApiError, errorMessage } from '@/lib/api';
+import { formatPeso } from '@/lib/format';
+import { Plus, Pencil, Trash2, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
+const PLACEHOLDER_IMAGE = '/placeholder.svg';
+
+const emptyForm = {
+  name: '',
+  brand: '',
+  category: '',
+  pricePerDay: '',
+  seats: '',
+  transmission: 'Automatic' as 'Automatic' | 'Manual',
+  fuel: '',
+  available: true,
+  description: '',
+  year: '',
+  mileage: '',
+  features: '',
+  image: PLACEHOLDER_IMAGE,
+};
+
+type FormData = typeof emptyForm;
+
 export function ManageVehicles() {
-  const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
-  const { vehicles, addVehicle, updateVehicle, deleteVehicle } = useVehicleStore();
+  const { data: vehicles = [], isLoading, isError, refetch } = useCars();
+  const saveCar = useSaveCar();
+  const deleteCar = useDeleteCar();
 
   // Modal states
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
@@ -28,39 +48,18 @@ export function ManageVehicles() {
   const [deletingVehicle, setDeletingVehicle] = useState<Car | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    brand: '',
-    category: '',
-    pricePerDay: '',
-    seats: '',
-    transmission: 'Automatic' as 'Automatic' | 'Manual',
-    fuel: '',
-    available: true,
-    description: '',
-  });
+  const [formData, setFormData] = useState<FormData>(emptyForm);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Check authentication
-  useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'admin') {
-      navigate('/adminlogin');
-    }
-  }, [isAuthenticated, user, navigate]);
+  const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) =>
+    setFormData((current) => ({ ...current, [field]: value }));
 
   // Open add modal
   const handleAdd = () => {
     setEditingVehicle(null);
-    setFormData({
-      name: '',
-      brand: '',
-      category: '',
-      pricePerDay: '',
-      seats: '',
-      transmission: 'Automatic',
-      fuel: '',
-      available: true,
-      description: '',
-    });
+    setFormData(emptyForm);
+    setFieldErrors({});
     setIsAddEditOpen(true);
   };
 
@@ -76,20 +75,37 @@ export function ManageVehicles() {
       transmission: vehicle.transmission,
       fuel: vehicle.fuel,
       available: vehicle.available,
-      description: vehicle.description || '',
+      description: vehicle.description ?? '',
+      year: vehicle.year?.toString() ?? '',
+      mileage: vehicle.mileage ?? '',
+      features: (vehicle.features ?? []).join('\n'),
+      image: vehicle.image || PLACEHOLDER_IMAGE,
     });
+    setFieldErrors({});
     setIsAddEditOpen(true);
   };
 
+  const handleImageSelected = async (file: File | undefined) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      updateField('image', await uploadCarImage(file));
+      toast.success('Image uploaded');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Save vehicle (add or edit)
-  const handleSave = () => {
-    // Simple validation
-    if (!formData.name || !formData.brand || !formData.category || !formData.pricePerDay) {
+  const handleSave = async () => {
+    if (!formData.name || !formData.brand || !formData.category || !formData.pricePerDay || !formData.fuel) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    const vehicleData = {
+    const vehicleData: CarInput = {
       name: formData.name,
       brand: formData.brand,
       category: formData.category,
@@ -98,23 +114,22 @@ export function ManageVehicles() {
       transmission: formData.transmission,
       fuel: formData.fuel,
       available: formData.available,
-      description: formData.description,
-      image: '/placeholder.svg',
-      year: 2024,
-      mileage: 'Unlimited',
-      features: [],
-      images: ['/placeholder.svg'],
+      description: formData.description || null,
+      image: formData.image || PLACEHOLDER_IMAGE,
+      year: formData.year ? Number(formData.year) : null,
+      mileage: formData.mileage || null,
+      features: formData.features.split('\n').map((f) => f.trim()).filter(Boolean),
+      images: editingVehicle?.images ?? [],
     };
 
-    if (editingVehicle) {
-      updateVehicle(editingVehicle.id, vehicleData);
-      toast.success(`${formData.name} updated successfully`);
-    } else {
-      addVehicle(vehicleData);
-      toast.success(`${formData.name} added successfully`);
+    try {
+      await saveCar.mutateAsync({ id: editingVehicle?.id, data: vehicleData });
+      toast.success(`${formData.name} ${editingVehicle ? 'updated' : 'added'} successfully`);
+      setIsAddEditOpen(false);
+    } catch (error) {
+      if (error instanceof ApiError) setFieldErrors(error.fields);
+      toast.error(errorMessage(error));
     }
-
-    setIsAddEditOpen(false);
   };
 
   // Open delete confirmation
@@ -124,14 +139,21 @@ export function ManageVehicles() {
   };
 
   // Confirm delete
-  const handleDeleteConfirm = () => {
-    if (deletingVehicle) {
-      deleteVehicle(deletingVehicle.id);
+  const handleDeleteConfirm = async () => {
+    if (!deletingVehicle) return;
+    try {
+      await deleteCar.mutateAsync(deletingVehicle.id);
       toast.success(`${deletingVehicle.name} deleted successfully`);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
       setIsDeleteOpen(false);
       setDeletingVehicle(null);
     }
   };
+
+  const fieldError = (field: string) =>
+    fieldErrors[field] && <p className="text-sm text-destructive">{fieldErrors[field]}</p>;
 
   return (
     <div className="min-h-screen bg-background">
@@ -185,13 +207,13 @@ export function ManageVehicles() {
                   <TableCell>{vehicle.brand}</TableCell>
                   <TableCell>{vehicle.category}</TableCell>
                   <TableCell className="font-semibold text-primary">
-                    ₱{vehicle.pricePerDay}
+                    {formatPeso(vehicle.pricePerDay)}
                   </TableCell>
                   <TableCell>
                     {vehicle.available ? (
                       <Badge className="bg-green-500">Available</Badge>
                     ) : (
-                      <Badge variant="secondary">Rented</Badge>
+                      <Badge variant="secondary">Unavailable</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -218,10 +240,23 @@ export function ManageVehicles() {
             </TableBody>
           </Table>
 
-          {vehicles.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No vehicles yet. Add your first vehicle!</p>
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
+          ) : isError ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">Could not load vehicles.</p>
+              <Button variant="outline" onClick={() => refetch()}>
+                Try Again
+              </Button>
+            </div>
+          ) : (
+            vehicles.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No vehicles yet. Add your first vehicle!</p>
+              </div>
+            )
           )}
         </div>
         </main>
@@ -239,24 +274,63 @@ export function ManageVehicles() {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            {/* Photo */}
+            <div className="flex items-center gap-4">
+              <img
+                src={formData.image}
+                alt="Vehicle preview"
+                className="w-32 h-24 object-cover rounded-lg border border-border bg-secondary"
+              />
+              <div className="space-y-2">
+                <Label htmlFor="image-upload">Photo</Label>
+                <div>
+                  <Button variant="outline" size="sm" asChild disabled={isUploading}>
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      {isUploading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4 mr-2" />
+                      )}
+                      {isUploading ? 'Uploading...' : 'Upload image'}
+                    </label>
+                  </Button>
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={isUploading}
+                    onChange={(e) => {
+                      handleImageSelected(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">JPG, PNG or WebP, up to 5 MB</p>
+                {fieldError('image')}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => updateField('name', e.target.value)}
                   placeholder="e.g., Rolls-Royce Phantom"
                 />
+                {fieldError('name')}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand *</Label>
                 <Input
                   id="brand"
                   value={formData.brand}
-                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  onChange={(e) => updateField('brand', e.target.value)}
                   placeholder="e.g., Rolls-Royce"
                 />
+                {fieldError('brand')}
               </div>
             </div>
 
@@ -266,19 +340,22 @@ export function ManageVehicles() {
                 <Input
                   id="category"
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) => updateField('category', e.target.value)}
                   placeholder="e.g., Luxury Sedan"
                 />
+                {fieldError('category')}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="price">Price per Day (₱) *</Label>
                 <Input
                   id="price"
                   type="number"
+                  min="1"
                   value={formData.pricePerDay}
-                  onChange={(e) => setFormData({ ...formData, pricePerDay: e.target.value })}
+                  onChange={(e) => updateField('pricePerDay', e.target.value)}
                   placeholder="e.g., 1500"
                 />
+                {fieldError('pricePerDay')}
               </div>
             </div>
 
@@ -288,18 +365,18 @@ export function ManageVehicles() {
                 <Input
                   id="seats"
                   type="number"
+                  min="1"
                   value={formData.seats}
-                  onChange={(e) => setFormData({ ...formData, seats: e.target.value })}
+                  onChange={(e) => updateField('seats', e.target.value)}
                   placeholder="e.g., 5"
                 />
+                {fieldError('seats')}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="transmission">Transmission</Label>
                 <Select
                   value={formData.transmission}
-                  onValueChange={(value: 'Automatic' | 'Manual') =>
-                    setFormData({ ...formData, transmission: value })
-                  }
+                  onValueChange={(value: 'Automatic' | 'Manual') => updateField('transmission', value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -311,13 +388,38 @@ export function ManageVehicles() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="fuel">Fuel Type</Label>
+                <Label htmlFor="fuel">Fuel Type *</Label>
                 <Input
                   id="fuel"
                   value={formData.fuel}
-                  onChange={(e) => setFormData({ ...formData, fuel: e.target.value })}
+                  onChange={(e) => updateField('fuel', e.target.value)}
                   placeholder="e.g., Gasoline"
                 />
+                {fieldError('fuel')}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="year">Year</Label>
+                <Input
+                  id="year"
+                  type="number"
+                  value={formData.year}
+                  onChange={(e) => updateField('year', e.target.value)}
+                  placeholder="e.g., 2024"
+                />
+                {fieldError('year')}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mileage">Mileage</Label>
+                <Input
+                  id="mileage"
+                  value={formData.mileage}
+                  onChange={(e) => updateField('mileage', e.target.value)}
+                  placeholder="e.g., Unlimited"
+                />
+                {fieldError('mileage')}
               </div>
             </div>
 
@@ -326,10 +428,23 @@ export function ManageVehicles() {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => updateField('description', e.target.value)}
                 placeholder="Brief description of the vehicle..."
                 rows={3}
               />
+              {fieldError('description')}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="features">Features (one per line)</Label>
+              <Textarea
+                id="features"
+                value={formData.features}
+                onChange={(e) => updateField('features', e.target.value)}
+                placeholder={'Massage Seats\nPanoramic Sunroof'}
+                rows={4}
+              />
+              {fieldError('features')}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -337,7 +452,7 @@ export function ManageVehicles() {
                 type="checkbox"
                 id="available"
                 checked={formData.available}
-                onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+                onChange={(e) => updateField('available', e.target.checked)}
                 className="rounded"
               />
               <Label htmlFor="available">Available for rent</Label>
@@ -348,7 +463,8 @@ export function ManageVehicles() {
             <Button variant="outline" onClick={() => setIsAddEditOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} className="bg-primary">
+            <Button onClick={handleSave} className="bg-primary" disabled={saveCar.isPending || isUploading}>
+              {saveCar.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingVehicle ? 'Update' : 'Add'} Vehicle
             </Button>
           </DialogFooter>
@@ -361,7 +477,8 @@ export function ManageVehicles() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete {deletingVehicle?.name}. This action cannot be undone.
+              This will delete {deletingVehicle?.name}. Past bookings keep their record, but this action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

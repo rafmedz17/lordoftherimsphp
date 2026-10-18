@@ -1,9 +1,11 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { mockCars } from '@/features/cars/data/mockCars';
+import { useCar, useCars } from '@/features/cars/api';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { LoginModal } from '@/features/auth/components/LoginModal';
+import { BookingDialog } from '@/features/bookings/components/BookingDialog';
+import { formatPeso } from '@/lib/format';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import {
@@ -15,17 +17,26 @@ import {
   MapPin,
   Check,
   ChevronLeft,
-  Home
+  Loader2
 } from 'lucide-react';
 
 export function CarDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
-  // Find the car by ID
-  const car = mockCars.find((c) => c.id === id);
+  const { data: car, isLoading } = useCar(id);
+  const { data: allCars = [] } = useCars();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // If car not found, show not found message
   if (!car) {
@@ -48,7 +59,7 @@ export function CarDetail() {
       setShowLogin(true);
       toast.info('Please login to rent this vehicle');
     } else {
-      toast.success(`Rental request initiated for ${car.name}`);
+      setShowBooking(true);
     }
   };
 
@@ -150,7 +161,7 @@ export function CarDetail() {
             {/* Price */}
             <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-4xl font-bold text-primary">₱{car.pricePerDay}</span>
+                <span className="text-4xl font-bold text-primary">{formatPeso(car.pricePerDay)}</span>
                 <span className="text-lg text-muted-foreground">/day</span>
               </div>
               {car.mileage && (
@@ -242,7 +253,7 @@ export function CarDetail() {
         <div className="mt-20">
           <h2 className="text-3xl font-bold text-foreground mb-8">Similar Vehicles</h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {mockCars
+            {allCars
               .filter((c) => c.id !== car.id && c.category === car.category)
               .slice(0, 3)
               .map((similarCar) => (
@@ -262,7 +273,7 @@ export function CarDetail() {
                     <h3 className="font-bold text-foreground mb-1">{similarCar.name}</h3>
                     <p className="text-sm text-muted-foreground mb-2">{similarCar.category}</p>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-lg font-bold text-primary">₱{similarCar.pricePerDay}</span>
+                      <span className="text-lg font-bold text-primary">{formatPeso(similarCar.pricePerDay)}</span>
                       <span className="text-sm text-muted-foreground">/day</span>
                     </div>
                   </div>
@@ -273,6 +284,7 @@ export function CarDetail() {
       </div>
 
       <LoginModal open={showLogin} onOpenChange={setShowLogin} />
+      <BookingDialog car={car} open={showBooking} onOpenChange={setShowBooking} />
     </div>
   );
 }

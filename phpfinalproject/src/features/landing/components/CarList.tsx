@@ -6,15 +6,20 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Users, Gauge, Fuel, Lock, Search, X, Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import { mockCars } from '@/features/cars/data/mockCars';
+import { Users, Gauge, Fuel, Lock, Search, X, Filter, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { useCars } from '@/features/cars/api';
+import { Car } from '@/features/cars/types/car';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { LoginModal } from '@/features/auth/components/LoginModal';
+import { BookingDialog } from '@/features/bookings/components/BookingDialog';
+import { formatPeso } from '@/lib/format';
 import { toast } from 'sonner';
 
 export function CarList() {
   const [showLogin, setShowLogin] = useState(false);
+  const [bookingCar, setBookingCar] = useState<Car | null>(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { data: cars = [], isLoading, isError, refetch } = useCars();
 
   // Search and filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +32,7 @@ export function CarList() {
 
   // Filter logic
   const filteredCars = useMemo(() => {
-    return mockCars.filter((car) => {
+    return cars.filter((car) => {
       // Search filter (name and brand)
       const matchesSearch = searchTerm === '' ||
         car.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -59,12 +64,12 @@ export function CarList() {
       return matchesSearch && matchesCategory && matchesAvailability &&
              matchesFuelType && matchesSeats && matchesPriceRange;
     });
-  }, [searchTerm, selectedCategory, showAvailableOnly, selectedFuelTypes, selectedSeats, priceRange]);
+  }, [cars, searchTerm, selectedCategory, showAvailableOnly, selectedFuelTypes, selectedSeats, priceRange]);
 
   // Get unique values for filters
-  const categories = Array.from(new Set(mockCars.map(car => car.category)));
-  const fuelTypes = Array.from(new Set(mockCars.map(car => car.fuel)));
-  const seatOptions = Array.from(new Set(mockCars.map(car => car.seats))).sort((a, b) => a - b);
+  const categories = Array.from(new Set(cars.map(car => car.category)));
+  const fuelTypes = Array.from(new Set(cars.map(car => car.fuel)));
+  const seatOptions = Array.from(new Set(cars.map(car => car.seats))).sort((a, b) => a - b);
 
   // Helper functions
   const clearAllFilters = () => {
@@ -82,12 +87,12 @@ export function CarList() {
     );
   };
 
-  const handleRentClick = (carName: string) => {
+  const handleRentClick = (car: Car) => {
     if (!isAuthenticated) {
       setShowLogin(true);
       toast.info('Please login to rent a vehicle');
     } else {
-      toast.success(`Rental request initiated for ${carName}`);
+      setBookingCar(car);
     }
   };
 
@@ -300,13 +305,24 @@ export function CarList() {
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
                 Showing <span className="font-semibold text-foreground">{filteredCars.length}</span> of{' '}
-                <span className="font-semibold text-foreground">{mockCars.length}</span> vehicles
+                <span className="font-semibold text-foreground">{cars.length}</span> vehicles
               </p>
             </div>
           </div>
 
           {/* Car Grid or Empty State */}
-          {filteredCars.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : isError ? (
+            <div className="text-center py-16">
+              <p className="text-muted-foreground mb-4">We couldn't load the vehicle collection.</p>
+              <Button onClick={() => refetch()} variant="outline">
+                Try Again
+              </Button>
+            </div>
+          ) : filteredCars.length === 0 ? (
             <div className="text-center py-16">
               <div className="bg-card border border-border rounded-lg p-12 max-w-md mx-auto">
                 <div className="text-6xl mb-4">🚗</div>
@@ -371,14 +387,14 @@ export function CarList() {
                   {/* Price & Action */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-2xl font-bold text-primary">₱{car.pricePerDay}</span>
+                      <span className="text-2xl font-bold text-primary">{formatPeso(car.pricePerDay)}</span>
                       <span className="text-sm text-muted-foreground">/day</span>
                     </div>
                     <Button
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        handleRentClick(car.name);
+                        handleRentClick(car);
                       }}
                       disabled={!car.available}
                       className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
@@ -404,6 +420,9 @@ export function CarList() {
       </section>
 
       <LoginModal open={showLogin} onOpenChange={setShowLogin} />
+      {bookingCar && (
+        <BookingDialog car={bookingCar} open onOpenChange={(open) => !open && setBookingCar(null)} />
+      )}
     </>
   );
 }

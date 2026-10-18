@@ -1,14 +1,26 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ShipWheel, LucideCar } from 'lucide-react';
+import { Menu, X, LucideCar } from 'lucide-react';
 import { useAuthStore } from '@/features/auth/stores/authStore';
 import { LoginModal } from '@/features/auth/components/LoginModal';
+import { toast } from 'sonner';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const { isAuthenticated, user, logout } = useAuthStore();
+
+  const handleLogout = async () => {
+    setIsOpen(false);
+    await logout();
+    toast.success('You have been logged out');
+  };
+
+  const accountLink =
+    user?.role === 'admin'
+      ? { name: 'Admin Panel', to: '/admin/dashboard' }
+      : { name: 'My Bookings', to: '/my-bookings' };
 
   const navItems = [
     { name: 'Home', href: '#home' },
@@ -50,8 +62,11 @@ export function Navbar() {
               {isAuthenticated ? (
                 <>
                   <span className="text-muted-foreground">Welcome, {user?.name}</span>
+                  <Link to={accountLink.to} className="text-foreground hover:text-primary transition-colors font-medium">
+                    {accountLink.name}
+                  </Link>
                   <Button
-                    onClick={logout}
+                    onClick={handleLogout}
                     variant="outline"
                     className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                   >
@@ -95,11 +110,15 @@ export function Navbar() {
               {isAuthenticated ? (
                 <>
                   <div className="text-muted-foreground">Welcome, {user?.name}</div>
+                  <Link
+                    to={accountLink.to}
+                    className="block text-foreground hover:text-primary transition-colors font-medium"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {accountLink.name}
+                  </Link>
                   <Button
-                    onClick={() => {
-                      logout();
-                      setIsOpen(false);
-                    }}
+                    onClick={handleLogout}
                     variant="outline"
                     className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                   >

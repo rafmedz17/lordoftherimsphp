@@ -1,0 +1,26 @@
+# Apache config for the site root (copied into dist/ by the build).
+RewriteEngine On
+
+# Real files and folders (JS, CSS, images, uploads) are served as-is.
+# Requests under /api/ are handled by api/.htaccess instead.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Everything else is a React route such as /cars/3 or /admin/dashboard: serve the app.
+RewriteRule ^ index.html [L]
+
+# Never serve hidden files such as .git or .env.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# Hashed build assets never change, so browsers can cache them for a year.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^index\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
