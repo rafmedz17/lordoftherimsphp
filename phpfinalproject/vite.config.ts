@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 // The PHP API runs separately during development (`npm run dev:api` on port 8000).
 // changeOrigin stays false so PHP sees the browser's Host header, which its
@@ -9,7 +8,7 @@ import { componentTagger } from "lovable-tagger";
 const PHP_DEV_SERVER = { target: "http://127.0.0.1:8000", changeOrigin: false };
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   server: {
     host: "::",
     port: 8080,
@@ -18,10 +17,10 @@ export default defineConfig(({ mode }) => ({
       "/uploads": PHP_DEV_SERVER,
     },
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+});
