@@ -21,6 +21,7 @@ import { Booking } from '../types/booking';
 import { getStatusColor } from '../utils';
 import { errorMessage } from '@/lib/api';
 import { formatDate, formatPeso } from '@/lib/format';
+import { assetUrl } from '@/lib/paths';
 
 export function MyBookings() {
   const navigate = useNavigate();
@@ -93,7 +94,7 @@ export function MyBookings() {
                 className="bg-card border border-border rounded-xl p-4 sm:p-6 flex flex-col sm:flex-row gap-4"
               >
                 <img
-                  src={booking.vehicleImage ?? '/placeholder.svg'}
+                  src={assetUrl(booking.vehicleImage)}
                   alt={booking.vehicleName}
                   className="w-full sm:w-40 h-28 object-cover rounded-lg bg-secondary"
                 />

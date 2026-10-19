@@ -1,3 +1,5 @@
+import { BASE_PATH } from './paths';
+
 /** Error returned by the PHP API, with optional per-field validation messages. */
 export class ApiError extends Error {
   constructor(
@@ -22,7 +24,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, { method, headers, body: payload, credentials: 'same-origin' });
+    response = await fetch(`${BASE_PATH}api${path}`, { method, headers, body: payload, credentials: 'same-origin' });
   } catch {
     throw new ApiError('Could not reach the server. Check your connection and try again.', 0);
   }

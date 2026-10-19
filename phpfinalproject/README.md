@@ -153,6 +153,17 @@ This file is **not** part of `dist/` and is git-ignored, so your password never 
 3. Create your account, make it admin with the SQL from [Make yourself an admin](#make-yourself-an-admin), then sign in at `/adminlogin`.
 4. In **Manage Vehicles**, upload real photos for each car. The starter cars use a placeholder image.
 
+### Sharing an alwaysdata account with another site
+
+A free account can only use the address `ACCOUNT.alwaysdata.net`, not sub-addresses. If another project already uses it, serve this one from a sub-path instead:
+
+1. Create a folder **outside** `/www/`, e.g. `/lordoftherims/`.
+2. **Web → Sites → Add a site**: address `ACCOUNT.alwaysdata.net/lordoftherims`, type **PHP**, root directory `/lordoftherims/`.
+3. Build with `npm run build:alwaysdata` instead of `npm run build`. This builds the app for the `/lordoftherims/` path. To use a different path, change `--base` in that script in `package.json`.
+4. Upload the contents of `dist/` into `/lordoftherims/` (not `/www/`), and put `config.php` in `/lordoftherims/api/`.
+
+The `.htaccess` files work out their own path automatically, so they need no changes.
+
 ### Updating the live site later
 
 Run `npm run build` again and upload the contents of `dist/` over `/www/`. Two things stay on the server because they aren't in `dist/`:

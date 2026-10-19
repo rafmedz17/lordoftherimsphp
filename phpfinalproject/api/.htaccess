@@ -1,4 +1,10 @@
 # Send every request under /api to index.php, including paths that match real
 # files, so lib/, handlers/ and config.php can never be requested directly.
 RewriteEngine On
-RewriteRule ^ index.php [END,QSA]
+
+# Work out this folder's URL (e.g. "/api/" or "/lordoftherims/api/") so the rule
+# also works when the site is served from a sub-path.
+RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+RewriteRule ^.*$ - [E=API_BASE:%2]
+
+RewriteRule ^ %{ENV:API_BASE}index.php [END,QSA]

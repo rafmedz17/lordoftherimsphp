@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Loader2
 } from 'lucide-react';
+import { assetUrl } from '@/lib/paths';
 
 export function CarDetail() {
   const { id } = useParams<{ id: string }>();
@@ -111,7 +112,7 @@ export function CarDetail() {
           <div className="space-y-4">
             <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-secondary border border-border">
               <img
-                src={car.image}
+                src={assetUrl(car.image)}
                 alt={car.name}
                 className="w-full h-full object-cover"
               />
@@ -135,7 +136,7 @@ export function CarDetail() {
                     className="aspect-video rounded-lg overflow-hidden bg-secondary border border-border cursor-pointer hover:border-primary transition-colors"
                   >
                     <img
-                      src={img}
+                      src={assetUrl(img)}
                       alt={`${car.name} view ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
@@ -264,7 +265,7 @@ export function CarDetail() {
                 >
                   <div className="relative h-48 overflow-hidden bg-secondary">
                     <img
-                      src={similarCar.image}
+                      src={assetUrl(similarCar.image)}
                       alt={similarCar.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />

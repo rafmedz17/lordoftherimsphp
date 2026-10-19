@@ -15,6 +15,7 @@ import { ApiError, errorMessage } from '@/lib/api';
 import { formatPeso } from '@/lib/format';
 import { Plus, Pencil, Trash2, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { assetUrl } from '@/lib/paths';
 
 const PLACEHOLDER_IMAGE = '/placeholder.svg';
 
@@ -198,7 +199,7 @@ export function ManageVehicles() {
                 <TableRow key={vehicle.id}>
                   <TableCell>
                     <img
-                      src={vehicle.image}
+                      src={assetUrl(vehicle.image)}
                       alt={vehicle.name}
                       className="w-16 h-12 object-cover rounded"
                     />
@@ -277,7 +278,7 @@ export function ManageVehicles() {
             {/* Photo */}
             <div className="flex items-center gap-4">
               <img
-                src={formData.image}
+                src={assetUrl(formData.image)}
                 alt="Vehicle preview"
                 className="w-32 h-24 object-cover rounded-lg border border-border bg-secondary"
               />

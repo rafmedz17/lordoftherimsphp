@@ -1,14 +1,19 @@
 # Apache config for the site root (copied into dist/ by the build).
+# Works whether the site is served at "/" or from a sub-path such as "/lordoftherims/".
 RewriteEngine On
 
+# Work out the URL folder this file lives in and store it as BASE ("/" or "/lordoftherims/").
+RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+RewriteRule ^.*$ - [E=BASE:%2]
+
 # Real files and folders (JS, CSS, images, uploads) are served as-is.
-# Requests under /api/ are handled by api/.htaccess instead.
+# Requests under api/ are handled by api/.htaccess instead.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
 # Everything else is a React route such as /cars/3 or /admin/dashboard: serve the app.
-RewriteRule ^ index.html [L]
+RewriteRule ^ %{ENV:BASE}index.html [L]
 
 # Never serve hidden files such as .git or .env.
 <FilesMatch "^\.">

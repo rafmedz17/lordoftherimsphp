@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:api": "php -S 127.0.0.1:8000 api/dev-router.php",
     "build": "vite build && node scripts/copy-api.mjs",
+    "build:alwaysdata": "vite build --base=/lordoftherims/ && node scripts/copy-api.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

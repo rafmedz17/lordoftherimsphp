@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { queryClient } from "@/lib/queryClient";
+import { BASE_PATH } from "@/lib/paths";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { AdminLogin } from "./features/admin/pages/AdminLogin";
@@ -19,7 +20,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename={BASE_PATH}>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/cars/:id" element={<CarDetail />} />

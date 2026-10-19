@@ -14,6 +14,7 @@ import { LoginModal } from '@/features/auth/components/LoginModal';
 import { BookingDialog } from '@/features/bookings/components/BookingDialog';
 import { formatPeso } from '@/lib/format';
 import { toast } from 'sonner';
+import { assetUrl } from '@/lib/paths';
 
 export function CarList() {
   const [showLogin, setShowLogin] = useState(false);
@@ -346,7 +347,7 @@ export function CarList() {
                 {/* Car Image */}
                 <div className="relative h-56 overflow-hidden bg-secondary">
                   <img
-                    src={car.image}
+                    src={assetUrl(car.image)}
                     alt={car.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
